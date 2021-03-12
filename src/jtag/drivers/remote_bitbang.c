@@ -110,7 +110,7 @@ static int remote_bitbang_quit(void)
 
 	if (EOF == fflush(remote_bitbang_file)) {
 		LOG_ERROR("fflush: %s", strerror(errno));
-		return ERROR_FAIL;
+		//return ERROR_FAIL;
 	}
 
 	/* We only need to close one of the FILE*s, because they both use the same */
@@ -147,7 +147,7 @@ static bb_value_t remote_bitbang_rread(void)
 	if (EOF == fflush(remote_bitbang_file)) {
 		remote_bitbang_quit();
 		LOG_ERROR("fflush: %s", strerror(errno));
-		return BB_ERROR;
+		//return BB_ERROR;
 	}
 
 	/* Enable blocking access. */
