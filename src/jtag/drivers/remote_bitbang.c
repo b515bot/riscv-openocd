@@ -24,8 +24,6 @@
 #include <sys/un.h>
 #include <netdb.h>
 #endif
-#include "helper/system.h"
-#include "helper/replacements.h"
 #include <jtag/interface.h>
 #include "bitbang.h"
 
@@ -35,7 +33,6 @@
 static char *remote_bitbang_host;
 static char *remote_bitbang_port;
 
-//static FILE *remote_bitbang_file;
 static int remote_bitbang_fd;
 
 /* Circular buffer. When start == end, the buffer is empty. */
@@ -76,7 +73,8 @@ static int remote_bitbang_fill_buf(void)
 			return ERROR_OK;
 		} else if (count < 0) {
 #ifdef _WIN32
-			if (WSAGetLastError() == WSAEWOULDBLOCK) {
+            errno = WSAGetLastError();
+			if (errno == WSAEWOULDBLOCK) {
 #else
 			if (errno == EAGAIN) {
 #endif
@@ -94,33 +92,25 @@ static int remote_bitbang_fill_buf(void)
 
 static int remote_bitbang_putc(int c)
 {
-// 	if (EOF == fputc(c, remote_bitbang_file)) {
-// 		LOG_ERROR("remote_bitbang_putc: %s", strerror(errno));
-// 		return ERROR_FAIL;
-// 	}
-	char buffer=c;
-	write_socket(remote_bitbang_fd,&buffer,sizeof(buffer));
+    char buf = c;
+    ssize_t count = write_socket(remote_bitbang_fd, &buf, sizeof(buf));
+    if (count < 0) {
+		LOG_ERROR("remote_bitbang_putc: %s", strerror(errno));
+		return ERROR_FAIL;
+	}
 	return ERROR_OK;
 }
 
 static int remote_bitbang_quit(void)
 {
-// 	if (EOF == fputc('Q', remote_bitbang_file)) {
-// 		LOG_ERROR("fputs: %s", strerror(errno));
-// 		return ERROR_FAIL;
-// 	}
-	remote_bitbang_putc('Q');
-// 	if (EOF == fflush(remote_bitbang_file)) {
-// 		LOG_ERROR("fflush: %s", strerror(errno));
-// 		//return ERROR_FAIL;
-// 	}
+    if (ERROR_FAIL == remote_bitbang_putc('Q')) {
+		return ERROR_FAIL;
+	}
 
-	/* We only need to close one of the FILE*s, because they both use the same */
-	/* underlying file descriptor. */
-// 	if (EOF == fclose(remote_bitbang_file)) {
-// 		LOG_ERROR("fclose: %s", strerror(errno));
-// 		return ERROR_FAIL;
-// 	}
+	if (!close_socket(remote_bitbang_fd)) {
+		LOG_ERROR("close_socket: %s", strerror(errno));
+		return ERROR_FAIL;
+	}
 
 	free(remote_bitbang_host);
 	free(remote_bitbang_port);
@@ -146,12 +136,6 @@ static bb_value_t char_to_int(int c)
 /* Get the next read response. */
 static bb_value_t remote_bitbang_rread(void)
 {
-// 	if (EOF == fflush(remote_bitbang_file)) {
-// 		//remote_bitbang_quit();
-// 		LOG_ERROR("fflush: %s", strerror(errno));
-// 		//return BB_ERROR;
-// 	}
-
 	/* Enable blocking access. */
 	socket_block(remote_bitbang_fd);
 	char c;
