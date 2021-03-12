@@ -73,15 +73,13 @@ static int remote_bitbang_fill_buf(void)
 			return ERROR_OK;
 		} else if (count < 0) {
 #ifdef _WIN32
-            errno = WSAGetLastError();
-			if (errno == WSAEWOULDBLOCK) {
+			if (WSAGetLastError() == WSAEWOULDBLOCK) {
 #else
 			if (errno == EAGAIN) {
 #endif
 				return ERROR_OK;
 			} else {
-				LOG_ERROR("remote_bitbang_fill_buf: %s (%d)",
-						strerror(errno), errno);
+				log_socket_error("remote_bitbang_fill_buf");
 				return ERROR_FAIL;
 			}
 		}
@@ -92,10 +90,10 @@ static int remote_bitbang_fill_buf(void)
 
 static int remote_bitbang_putc(int c)
 {
-    char buf = c;
-    ssize_t count = write_socket(remote_bitbang_fd, &buf, sizeof(buf));
-    if (count < 0) {
-		LOG_ERROR("remote_bitbang_putc: %s", strerror(errno));
+	char buf = c;
+	ssize_t count = write_socket(remote_bitbang_fd, &buf, sizeof(buf));
+	if (count < 0) {
+		log_socket_error("remote_bitbang_putc");
 		return ERROR_FAIL;
 	}
 	return ERROR_OK;
@@ -103,12 +101,11 @@ static int remote_bitbang_putc(int c)
 
 static int remote_bitbang_quit(void)
 {
-    if (ERROR_FAIL == remote_bitbang_putc('Q')) {
+	if (remote_bitbang_putc('Q') == ERROR_FAIL)
 		return ERROR_FAIL;
-	}
 
 	if (!close_socket(remote_bitbang_fd)) {
-		LOG_ERROR("close_socket: %s", strerror(errno));
+		log_socket_error("close_socket");
 		return ERROR_FAIL;
 	}
 
@@ -144,7 +141,8 @@ static bb_value_t remote_bitbang_rread(void)
 		return char_to_int(c);
 	} else {
 		remote_bitbang_quit();
-		LOG_ERROR("read: count=%d, error=%s", (int) count, strerror(errno));
+		LOG_ERROR("read_socket: count=%d", (int) count);
+		log_socket_error("read_socket");
 		return BB_ERROR;
 	}
 }
@@ -230,7 +228,7 @@ static int remote_bitbang_init_tcp(void)
 	freeaddrinfo(result); /* No longer needed */
 
 	if (rp == NULL) { /* No address succeeded */
-		LOG_ERROR("Failed to connect: %s", strerror(errno));
+		log_socket_error("Failed to connect");
 		return ERROR_FAIL;
 	}
 
@@ -247,7 +245,7 @@ static int remote_bitbang_init_unix(void)
 	LOG_INFO("Connecting to unix socket %s", remote_bitbang_host);
 	int fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0) {
-		LOG_ERROR("socket: %s", strerror(errno));
+		log_socket_error("socket");
 		return ERROR_FAIL;
 	}
 
@@ -257,7 +255,7 @@ static int remote_bitbang_init_unix(void)
 	addr.sun_path[sizeof(addr.sun_path)-1] = '\0';
 
 	if (connect(fd, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) < 0) {
-		LOG_ERROR("connect: %s", strerror(errno));
+		log_socket_error("connect");
 		return ERROR_FAIL;
 	}
 
