@@ -65,7 +65,7 @@ static int remote_bitbang_fill_buf(void)
 			contiguous_available_space = remote_bitbang_start -
 				remote_bitbang_end - 1;
 		}
-		ssize_t count = read(remote_bitbang_fd,
+		ssize_t count = read_socket(remote_bitbang_fd,
 				remote_bitbang_buf + remote_bitbang_end,
 				contiguous_available_space);
 		if (count > 0) {
@@ -75,7 +75,11 @@ static int remote_bitbang_fill_buf(void)
 		} else if (count == 0) {
 			return ERROR_OK;
 		} else if (count < 0) {
+#ifdef _WIN32
+			if (WSAGetLastError() == WSAEWOULDBLOCK) {
+#else
 			if (errno == EAGAIN) {
+#endif
 				return ERROR_OK;
 			} else {
 				LOG_ERROR("remote_bitbang_fill_buf: %s (%d)",
@@ -149,7 +153,7 @@ static bb_value_t remote_bitbang_rread(void)
 	/* Enable blocking access. */
 	socket_block(remote_bitbang_fd);
 	char c;
-	ssize_t count = read(remote_bitbang_fd, &c, 1);
+	ssize_t count = read_socket(remote_bitbang_fd, &c, 1);
 	if (count == 1) {
 		return char_to_int(c);
 	} else {
@@ -289,8 +293,17 @@ static int remote_bitbang_init(void)
 
 	if (remote_bitbang_fd < 0)
 		return remote_bitbang_fd;
-
+#ifdef _WIN32
+	int remote_bitbang_osfhandle;
+	if ((remote_bitbang_osfhandle = _open_osfhandle(remote_bitbang_fd, _O_RDWR)) < 0) {
+		LOG_ERROR("_open_osfhandle: failed to open file descriptor");
+		close(remote_bitbang_fd);
+		return ERROR_FAIL;
+	}
+	remote_bitbang_file = _fdopen(remote_bitbang_osfhandle, "w+");
+#else
 	remote_bitbang_file = fdopen(remote_bitbang_fd, "w+");
+#endif
 	if (remote_bitbang_file == NULL) {
 		LOG_ERROR("fdopen: failed to open write stream");
 		close(remote_bitbang_fd);
