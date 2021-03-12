@@ -35,7 +35,7 @@
 static char *remote_bitbang_host;
 static char *remote_bitbang_port;
 
-static FILE *remote_bitbang_file;
+//static FILE *remote_bitbang_file;
 static int remote_bitbang_fd;
 
 /* Circular buffer. When start == end, the buffer is empty. */
@@ -94,31 +94,33 @@ static int remote_bitbang_fill_buf(void)
 
 static int remote_bitbang_putc(int c)
 {
-	if (EOF == fputc(c, remote_bitbang_file)) {
-		LOG_ERROR("remote_bitbang_putc: %s", strerror(errno));
-		return ERROR_FAIL;
-	}
+// 	if (EOF == fputc(c, remote_bitbang_file)) {
+// 		LOG_ERROR("remote_bitbang_putc: %s", strerror(errno));
+// 		return ERROR_FAIL;
+// 	}
+	char buffer=c;
+	write_socket(remote_bitbang_fd,&buffer,sizeof(buffer));
 	return ERROR_OK;
 }
 
 static int remote_bitbang_quit(void)
 {
-	if (EOF == fputc('Q', remote_bitbang_file)) {
-		LOG_ERROR("fputs: %s", strerror(errno));
-		return ERROR_FAIL;
-	}
-
-	if (EOF == fflush(remote_bitbang_file)) {
-		LOG_ERROR("fflush: %s", strerror(errno));
-		//return ERROR_FAIL;
-	}
+// 	if (EOF == fputc('Q', remote_bitbang_file)) {
+// 		LOG_ERROR("fputs: %s", strerror(errno));
+// 		return ERROR_FAIL;
+// 	}
+	remote_bitbang_putc('Q');
+// 	if (EOF == fflush(remote_bitbang_file)) {
+// 		LOG_ERROR("fflush: %s", strerror(errno));
+// 		//return ERROR_FAIL;
+// 	}
 
 	/* We only need to close one of the FILE*s, because they both use the same */
 	/* underlying file descriptor. */
-	if (EOF == fclose(remote_bitbang_file)) {
-		LOG_ERROR("fclose: %s", strerror(errno));
-		return ERROR_FAIL;
-	}
+// 	if (EOF == fclose(remote_bitbang_file)) {
+// 		LOG_ERROR("fclose: %s", strerror(errno));
+// 		return ERROR_FAIL;
+// 	}
 
 	free(remote_bitbang_host);
 	free(remote_bitbang_port);
@@ -144,11 +146,11 @@ static bb_value_t char_to_int(int c)
 /* Get the next read response. */
 static bb_value_t remote_bitbang_rread(void)
 {
-	if (EOF == fflush(remote_bitbang_file)) {
-		//remote_bitbang_quit();
-		LOG_ERROR("fflush: %s", strerror(errno));
-		//return BB_ERROR;
-	}
+// 	if (EOF == fflush(remote_bitbang_file)) {
+// 		//remote_bitbang_quit();
+// 		LOG_ERROR("fflush: %s", strerror(errno));
+// 		//return BB_ERROR;
+// 	}
 
 	/* Enable blocking access. */
 	socket_block(remote_bitbang_fd);
@@ -293,28 +295,6 @@ static int remote_bitbang_init(void)
 
 	if (remote_bitbang_fd < 0)
 		return remote_bitbang_fd;
-#ifdef _WIN32
-	int remote_bitbang_osfhandle;
-	if ((remote_bitbang_osfhandle = _open_osfhandle(remote_bitbang_fd, _O_RDWR)) < 0) {
-		LOG_ERROR("_open_osfhandle: failed to open file descriptor");
-		close(remote_bitbang_fd);
-		return ERROR_FAIL;
-	}
-	remote_bitbang_file = _fdopen(remote_bitbang_osfhandle, "w+");
-#else
-	remote_bitbang_file = fdopen(remote_bitbang_fd, "w+");
-#endif
-	if (remote_bitbang_file == NULL) {
-		LOG_ERROR("fdopen: failed to open write stream");
-		close(remote_bitbang_fd);
-		return ERROR_FAIL;
-	}
-	
-#ifdef _WIN32
-	 if (setvbuf(remote_bitbang_file, NULL, _IONBF, 0) != 0) {
-		LOG_ERROR("setvbuf: failed");
-	}
-#endif
 
 	LOG_INFO("remote_bitbang driver initialized");
 	return ERROR_OK;
