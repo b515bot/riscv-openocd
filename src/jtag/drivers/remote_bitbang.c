@@ -145,7 +145,7 @@ static bb_value_t char_to_int(int c)
 static bb_value_t remote_bitbang_rread(void)
 {
 	if (EOF == fflush(remote_bitbang_file)) {
-		remote_bitbang_quit();
+		//remote_bitbang_quit();
 		LOG_ERROR("fflush: %s", strerror(errno));
 		//return BB_ERROR;
 	}
