@@ -309,6 +309,12 @@ static int remote_bitbang_init(void)
 		close(remote_bitbang_fd);
 		return ERROR_FAIL;
 	}
+	
+#ifdef _WIN32
+	 if (setvbuf(remote_bitbang_file, NULL, _IONBF, 0) != 0) {
+		LOG_ERROR("setvbuf: failed");
+	}
+#endif
 
 	LOG_INFO("remote_bitbang driver initialized");
 	return ERROR_OK;
